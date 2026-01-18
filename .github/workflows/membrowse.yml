@@ -1,0 +1,37 @@
+name: Memory Analysis
+
+# Trigger only on pushes to master
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - uses: actions/checkout@v3
+
+      # 2️⃣ Build the firmware
+      - name: Build firmware
+        run: make all  # adjust if you have a different target or Makefile
+
+      # 3️⃣ Run MemBrowse analysis
+      - name: Analyze memory
+        id: analyze
+        uses: membrowse/membrowse-action@v1
+        with:
+          elf: build/lvgl_stm32f429.elf       # your ELF
+          ld: LinkerScript.ld                 # your linker script
+          target_name: stm32f429              # target recognized by MemBrowse
+          api_key: ${{ secrets.MEMBROWSE_API_KEY }}
+
+      # 4️⃣ Post a PR comment if this is a PR
+      - name: Post PR comment
+        if: github.event_name == 'pull_request'
+        uses: membrowse/membrowse-action/comment-action@v1
+        with:
+          json_files: ${{ steps.analyze.outputs.report_path }}
