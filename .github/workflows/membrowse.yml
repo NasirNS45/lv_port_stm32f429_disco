@@ -12,26 +12,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repository
       - uses: actions/checkout@v3
+      - name: Install ARM GCC Toolchain
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi
 
-      # 2️⃣ Build the firmware
+      - name: Download LVGL source
+        run: |
+          mkdir -p lvgl
+          curl -L https://github.com/lvgl/lvgl/archive/refs/heads/master.zip -o lvgl.zip
+          unzip lvgl.zip -d lvgl
+
       - name: Build firmware
-        run: make all  # adjust if you have a different target or Makefile
+        run: make all
 
-      # 3️⃣ Run MemBrowse analysis
       - name: Analyze memory
         id: analyze
         uses: membrowse/membrowse-action@v1
         with:
-          elf: build/lvgl_stm32f429.elf       # your ELF
-          ld: LinkerScript.ld                 # your linker script
-          target_name: stm32f429              # target recognized by MemBrowse
+          elf: build/lvgl_stm32f429.elf
+          ld: LinkerScript.ld
+          target_name: stm32f429
           api_key: ${{ secrets.MEMBROWSE_API_KEY }}
 
-      # 4️⃣ Post a PR comment if this is a PR
       - name: Post PR comment
         if: github.event_name == 'pull_request'
         uses: membrowse/membrowse-action/comment-action@v1
         with:
           json_files: ${{ steps.analyze.outputs.report_path }}
+
