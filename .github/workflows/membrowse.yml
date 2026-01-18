@@ -1,42 +1,39 @@
-name: Memory Analysis
+name: STM32 LVGL Build
 
-# Trigger only on pushes to master
 on:
   push:
-    branches:
-      - master
+    branches: [ main ]
   pull_request:
 
 jobs:
-  analyze:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-      - name: Install ARM GCC Toolchain
-        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          submodules: true  # <-- auto-init LVGL submodule
 
-      - name: Download LVGL source
+      - name: Install ARM GCC
         run: |
-          mkdir -p lvgl
-          curl -L https://github.com/lvgl/lvgl/archive/refs/heads/master.zip -o lvgl.zip
-          unzip lvgl.zip -d lvgl
+          sudo apt update
+          sudo apt install -y gcc-arm-none-eabi make
 
-      - name: Build firmware
-        run: make all
+      - name: Build Project
+        run: |
+          make all
 
-      - name: Analyze memory
-        id: analyze
-        uses: membrowse/membrowse-action@v1
-        with:
-          elf: build/lvgl_stm32f429.elf
-          ld: LinkerScript.ld
-          target_name: stm32f429
-          api_key: ${{ secrets.MEMBROWSE_API_KEY }}
+      - name: Verify ELF
+        run: |
+          if [ ! -f build/lvgl_stm32f429.elf ]; then
+            echo "Build failed: ELF not generated!"
+            exit 1
+          fi
+          echo "ELF successfully built!"
 
-      - name: Post PR comment
-        if: github.event_name == 'pull_request'
-        uses: membrowse/membrowse-action/comment-action@v1
-        with:
-          json_files: ${{ steps.analyze.outputs.report_path }}
-
+      - name: MemBrowse Report (Optional)
+        run: |
+          sudo apt install -y python3-pip
+          pip install membrowse
+          membrowse report build/lvgl_stm32f429.elf LinkerScript.ld --json > membrowse.json

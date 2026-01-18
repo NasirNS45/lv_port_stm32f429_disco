@@ -1,67 +1,47 @@
 # =========================
-# Project
+# Project Settings
 # =========================
 TARGET = lvgl_stm32f429
 BUILD_DIR = build
+SRC_DIRS = HAL_Driver/Src lvgl src
+INC_DIRS = inc HAL_Driver/Inc CMSIS/core CMSIS/device lvgl
 
 # =========================
-# Toolchain
+# Compiler Settings
 # =========================
 CC = arm-none-eabi-gcc
-AS = arm-none-eabi-gcc
-OBJCOPY = arm-none-eabi-objcopy
-SIZE = arm-none-eabi-size
+CFLAGS = -Wall -O2 -mcpu=cortex-m4 -mthumb
+INCLUDES = $(foreach dir,$(INC_DIRS),-I$(dir))
 
 # =========================
-# MCU & Flags
+# Check LVGL Submodule
 # =========================
-MCU = cortex-m4
-CPU_FLAGS = -mcpu=$(MCU) -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
-
-DEFS = -DUSE_HAL_DRIVER -DSTM32F429xx
-CFLAGS = $(CPU_FLAGS) -O2 -Wall -ffunction-sections -fdata-sections $(DEFS)
-
-# =========================
-# Includes
-# =========================
-INCLUDES = -I. -Isrc -Iinc \
-           -ICMSIS/core -ICMSIS/device \
-           -IHAL_Driver/Inc \
-           -Ilvgl/src
+LVGL_DIR = lvgl
+ifeq ("$(wildcard $(LVGL_DIR)/lvgl.h)","")
+$(error "LVGL submodule not found! Please run: git submodule update --init --recursive")
+endif
 
 # =========================
-# Linker
+# Sources & Objects
 # =========================
-LDSCRIPT = LinkerScript.ld
-LDFLAGS = $(CPU_FLAGS) -T$(LDSCRIPT) -Wl,--gc-sections
+SRCS = $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c))
+OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCS))
+
+# Create build folder structure
+$(shell mkdir -p $(BUILD_DIR)/HAL_Driver/Src $(BUILD_DIR)/lvgl $(BUILD_DIR)/src)
 
 # =========================
-# Sources
-# =========================
-C_SOURCES = src/main.c src/system_stm32f4xx.c src/stm32f4xx_it.c src/syscalls.c
-HAL_SOURCES = HAL_Driver/Src/stm32f4xx_hal.c HAL_Driver/Src/stm32f4xx_hal_gpio.c HAL_Driver/Src/stm32f4xx_hal_rcc.c HAL_Driver/Src/stm32f4xx_hal_dma.c HAL_Driver/Src/stm32f4xx_hal_cortex.c
-LVGL_SOURCES = $(shell find lvgl/src -name "*.c")
-
-SOURCES = $(C_SOURCES) $(HAL_SOURCES) $(LVGL_SOURCES)
-OBJECTS = $(addprefix $(BUILD_DIR)/, $(SOURCES:.c=.o))
-
-# =========================
-# Rules
+# Build Rules
 # =========================
 all: $(BUILD_DIR)/$(TARGET).elf
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
-	mkdir -p $(dir $@)
+$(BUILD_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(BUILD_DIR)/$(TARGET).elf: $(OBJECTS)
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
-	$(SIZE) $@
+$(BUILD_DIR)/$(TARGET).elf: $(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -T LinkerScript.ld -o $@
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)/*
 
 .PHONY: all clean
