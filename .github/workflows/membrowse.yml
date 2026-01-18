@@ -2,7 +2,7 @@ name: STM32 LVGL Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
 
 jobs:
